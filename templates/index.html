@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Waste Collection Dashboard</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #f4f7f6;
+            color: #333;
+            padding: 20px;
+        }
+
+        /* Header */
+        header {
+            background: #1b4332;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* KPI Cards */
+        .kpi-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .kpi-card {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            flex: 1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 5px solid #2d6a4f;
+        }
+
+        .kpi-card.alert {
+            border-left-color: #d90429;
+        }
+
+        .kpi-card h4 {
+            color: #666;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        .kpi-card p {
+            font-size: 1.6rem;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+
+        /* Main Content */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        .panel h3 {
+            margin-bottom: 15px;
+            color: #1b4332;
+            font-size: 1.1rem;
+            border-bottom: 2px solid #f4f7f6;
+            padding-bottom: 8px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.9rem;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #555;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.8rem;
+            color: white;
+        }
+
+        .badge-danger {
+            background-color: #d90429;
+        }
+
+        .badge-success {
+            background-color: #2d6a4f;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        input {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        button {
+            background: #2d6a4f;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        button:hover {
+            background: #1b4332;
+        }
+
+        .btn-secondary {
+            background: #4a5568;
+            margin-bottom: 10px;
+        }
+
+        .btn-secondary:hover {
+            background: #2d3748;
+        }
+
+        #message {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- HEADER -->
+    <header>
+        <h2>Smart Waste Management System</h2>
+        <span>Oracle DBMS Micro-Project</span>
+    </header>
+
+
+    <!-- KPI CARDS -->
+    <div class="kpi-container">
+
+        <div class="kpi-card alert">
+            <h4>Critical Bins (&ge;80%)</h4>
+            <p id="kpi-critical-count">0</p>
+        </div>
+
+        <div class="kpi-card">
+            <h4>System Status</h4>
+            <p style="color: #2d6a4f;">Online</p>
+        </div>
+
+    </div>
+
+
+    <!-- MAIN CONTENT -->
+    <div class="content-grid">
+
+        <!-- CRITICAL BIN TABLE -->
+        <div class="panel">
+
+            <h3>Critical Bin Monitoring</h3>
+
+            <button
+                class="btn-secondary"
+                onclick="loadBins()">
+                Refresh Critical Bins
+            </button>
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>Bin ID</th>
+                        <th>Location</th>
+                        <th>Zone</th>
+                        <th>Fill Level</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <tbody id="binTableBody">
+
+                    <tr>
+                        <td colspan="5"
+                            style="text-align: center; color: #888;">
+                            Click refresh to fetch bin records from database.
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <!-- PICKUP FORM -->
+        <div class="panel">
+
+            <h3>Execute Pickup Routine</h3>
+
+            <div class="form-group">
+
+                <label for="binId">
+                    Bin ID
+                </label>
+
+                <input
+                    id="binId"
+                    type="number"
+                    placeholder="e.g. 502">
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label for="driverId">
+                    Assigned Driver ID
+                </label>
+
+                <input
+                    id="driverId"
+                    type="number"
+                    placeholder="e.g. 2">
+
+            </div>
+
+
+            <button onclick="pickup()">
+                Clear Bin
+            </button>
+
+            <p id="message"></p>
+
+        </div>
+
+    </div>
+
+
+    <!-- JAVASCRIPT -->
+    <script>
+
+        // =====================================================
+        // LOAD CRITICAL BINS
+        // =====================================================
+
+        async function loadBins() {
+
+            const tbody =
+                document.getElementById('binTableBody');
+
+            const count =
+                document.getElementById('kpi-critical-count');
+
+            try {
+
+                // Show loading message
+                tbody.innerHTML =
+                    '<tr>' +
+                    '<td colspan="5" style="text-align:center;">' +
+                    'Loading...' +
+                    '</td>' +
+                    '</tr>';
+
+
+                // Request data from Flask API
+                // Date.now() prevents browser caching
+                const response = await fetch(
+                    'http://localhost:5000/api/bins/critical?t='
+                    + Date.now()
+                );
+
+
+                // Check HTTP response
+                if (!response.ok) {
+
+                    throw new Error(
+                        'API returned status ' +
+                        response.status
+                    );
+
+                }
+
+
+                // Convert response to JSON
+                const data = await response.json();
+
+
+                // Clear old table
+                tbody.innerHTML = '';
+
+
+                // Update critical bin count
+                count.innerText = data.length;
+
+
+                // No critical bins
+                if (data.length === 0) {
+
+                    tbody.innerHTML =
+                        '<tr>' +
+                        '<td colspan="5" ' +
+                        'style="text-align:center;">' +
+                        'No critical bins found.' +
+                        '</td>' +
+                        '</tr>';
+
+                    return;
+                }
+
+
+                // Display every critical bin
+                data.forEach(bin => {
+
+                    const binId =
+                        bin.BIN_ID ?? bin.bin_id;
+
+                    const location =
+                        bin.STREET_ADDRESS ??
+                        bin.street_address;
+
+                    const zone =
+                        bin.ZONE_NAME ??
+                        bin.zone_name;
+
+                    const fillLevel =
+                        bin.FILL_LEVEL_PERCENT ??
+                        bin.fill_level_percent;
+
+                    const status =
+                        bin.STATUS ??
+                        bin.status;
+
+
+                    // Choose badge color
+                    const badgeClass =
+                        fillLevel >= 80
+                        ? 'badge-danger'
+                        : 'badge-success';
+
+
+                    // Add row
+                    tbody.innerHTML += `
+                        <tr>
+
+                            <td>
+                                <b>#${binId}</b>
+                            </td>
+
+                            <td>
+                                ${location}
+                            </td>
+
+                            <td>
+                                ${zone}
+                            </td>
+
+                            <td>
+                                <span class="badge ${badgeClass}">
+                                    ${fillLevel}%
+                                </span>
+                            </td>
+
+                            <td>
+                                ${status}
+                            </td>
+
+                        </tr>
+                    `;
+
+                });
+
+
+            } catch (err) {
+
+                console.error(
+                    'Error loading bins:',
+                    err
+                );
+
+
+                tbody.innerHTML =
+                    '<tr>' +
+                    '<td colspan="5" ' +
+                    'style="text-align:center;color:red;">' +
+                    'Failed to load bins. Check Flask server.' +
+                    '</td>' +
+                    '</tr>';
+
+            }
+
+        }
+
+
+        // =====================================================
+        // COMPLETE BIN PICKUP
+        // =====================================================
+
+        async function pickup() {
+
+            const binId =
+                document.getElementById('binId').value;
+
+            const driverId =
+                document.getElementById('driverId').value;
+
+            const msgElement =
+                document.getElementById('message');
+
+
+            // Validate input
+            if (!binId || !driverId) {
+
+                msgElement.style.color = 'red';
+
+                msgElement.innerText =
+                    'Please enter both Bin ID and Driver ID';
+
+                return;
+            }
+
+
+            try {
+
+                msgElement.style.color = '#555';
+
+                msgElement.innerText =
+                    'Processing pickup...';
+
+
+                // Send POST request to Flask
+                const response = await fetch(
+                    'http://localhost:5000/api/pickup',
+                    {
+                        method: 'POST',
+
+                        headers: {
+                            'Content-Type':
+                                'application/json'
+                        },
+
+                        body: JSON.stringify({
+
+                            bin_id:
+                                Number(binId),
+
+                            driver_id:
+                                Number(driverId)
+
+                        })
+
+                    }
+                );
+
+
+                // Convert response
+                const result =
+                    await response.json();
+
+
+                // Successful response
+                if (response.ok) {
+
+                    msgElement.style.color =
+                        '#2d6a4f';
+
+                    msgElement.innerText =
+                        result.message ||
+                        'Pickup completed successfully!';
+
+
+                    // Refresh table automatically
+                    await loadBins();
+
+                }
+
+
+                // Error response
+                else {
+
+                    msgElement.style.color =
+                        'red';
+
+                    msgElement.innerText =
+                        result.message ||
+                        'Error completing pickup';
+
+                }
+
+
+            } catch (err) {
+
+                console.error(
+                    'Pickup error:',
+                    err
+                );
+
+                msgElement.style.color =
+                    'red';
+
+                msgElement.innerText =
+                    'Server error. Check Flask backend.';
+
+            }
+
+        }
+
+
+        // =====================================================
+        // LOAD DATA WHEN PAGE OPENS
+        // =====================================================
+
+        loadBins();
+
+    </script>
+
+</body>
+</html>
