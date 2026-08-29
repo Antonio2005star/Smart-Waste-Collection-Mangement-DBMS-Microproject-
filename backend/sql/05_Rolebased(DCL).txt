@@ -1,0 +1,90 @@
+-- ============================================================
+-- DCL: ROLE-BASED ACCESS CONTROL
+-- SMART WASTE COLLECTION MANAGEMENT
+-- ============================================================
+
+-- Create roles
+CREATE ROLE waste_admin;
+CREATE ROLE waste_manager;
+CREATE ROLE waste_dispatcher;
+CREATE ROLE waste_driver;
+
+
+-- ============================================================
+-- ADMIN
+-- Full access to all core tables
+-- ============================================================
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON Zones TO waste_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON Locations TO waste_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON Bins TO waste_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON Drivers TO waste_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON Vehicles TO waste_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON Routes TO waste_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON Route_Bins TO waste_admin;
+GRANT SELECT, INSERT, UPDATE, DELETE ON Schedules TO waste_admin;
+
+
+-- ============================================================
+-- MANAGER
+-- Can view all data and update operational information
+-- ============================================================
+
+GRANT SELECT ON Zones TO waste_manager;
+GRANT SELECT ON Locations TO waste_manager;
+GRANT SELECT ON Bins TO waste_manager;
+GRANT SELECT ON Drivers TO waste_manager;
+GRANT SELECT ON Vehicles TO waste_manager;
+GRANT SELECT ON Routes TO waste_manager;
+GRANT SELECT ON Route_Bins TO waste_manager;
+GRANT SELECT ON Schedules TO waste_manager;
+
+GRANT UPDATE ON Bins TO waste_manager;
+GRANT UPDATE ON Drivers TO waste_manager;
+GRANT UPDATE ON Vehicles TO waste_manager;
+
+
+-- ============================================================
+-- DISPATCHER
+-- Manages routes, route-bin assignments and schedules
+-- ============================================================
+
+GRANT SELECT ON Zones TO waste_dispatcher;
+GRANT SELECT ON Locations TO waste_dispatcher;
+GRANT SELECT ON Bins TO waste_dispatcher;
+GRANT SELECT ON Drivers TO waste_dispatcher;
+GRANT SELECT ON Vehicles TO waste_dispatcher;
+GRANT SELECT ON Routes TO waste_dispatcher;
+GRANT SELECT ON Route_Bins TO waste_dispatcher;
+GRANT SELECT ON Schedules TO waste_dispatcher;
+
+GRANT INSERT, UPDATE, DELETE ON Routes TO waste_dispatcher;
+GRANT INSERT, UPDATE, DELETE ON Route_Bins TO waste_dispatcher;
+GRANT INSERT, UPDATE, DELETE ON Schedules TO waste_dispatcher;
+
+
+-- ============================================================
+-- DRIVER
+-- Can view operational information
+-- ============================================================
+
+GRANT SELECT ON Zones TO waste_driver;
+GRANT SELECT ON Locations TO waste_driver;
+GRANT SELECT ON Bins TO waste_driver;
+GRANT SELECT ON Drivers TO waste_driver;
+GRANT SELECT ON Vehicles TO waste_driver;
+GRANT SELECT ON Routes TO waste_driver;
+GRANT SELECT ON Route_Bins TO waste_driver;
+GRANT SELECT ON Schedules TO waste_driver;
+
+
+-- ============================================================
+-- REVOKE DEMONSTRATION
+-- Driver cannot delete bin records
+-- ============================================================
+
+REVOKE DELETE ON Bins FROM waste_driver;
+
+-- ============================================================
+-- END OF DCL
+-- ============================================================
