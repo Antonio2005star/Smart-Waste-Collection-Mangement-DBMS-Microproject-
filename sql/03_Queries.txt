@@ -1,0 +1,117 @@
+-- ============================================================
+-- SMART WASTE COLLECTION MANAGEMENT
+-- CORE SQL QUERIES
+-- ============================================================
+
+-- ============================================================
+-- SQL*PLUS OUTPUT FORMATTING
+-- ============================================================
+
+SET LINESIZE 150
+SET PAGESIZE 50
+SET WRAP OFF
+
+COLUMN zone_name FORMAT A20
+COLUMN street_address FORMAT A25
+COLUMN route_name FORMAT A25
+COLUMN driver_name FORMAT A20
+COLUMN vehicle FORMAT A15
+COLUMN status FORMAT A15
+COLUMN scheduled_date FORMAT A12
+
+COLUMN fill_level_percent FORMAT 990.99
+COLUMN average_fill FORMAT 990.99
+COLUMN total_bins FORMAT 999
+COLUMN total_stops FORMAT 999
+
+
+-- ============================================================
+-- 1. BIN MONITORING
+-- Find bins that are 80% or more full
+-- ============================================================
+
+SELECT 
+    b.bin_id,
+    l.street_address,
+    z.zone_name,
+    b.fill_level_percent,
+    b.status
+FROM Bins b
+JOIN Locations l ON b.location_id = l.location_id
+JOIN Zones z ON l.zone_id = z.zone_id
+WHERE b.fill_level_percent >= 80
+ORDER BY b.fill_level_percent DESC;
+
+
+-- ============================================================
+-- 2. ZONE ANALYSIS
+-- Show number of bins and average fill level in each zone
+-- ============================================================
+
+SELECT 
+    z.zone_name,
+    COUNT(b.bin_id) AS total_bins,
+    ROUND(AVG(b.fill_level_percent), 2) AS average_fill
+FROM Zones z
+JOIN Locations l ON z.zone_id = l.zone_id
+JOIN Bins b ON l.location_id = b.location_id
+GROUP BY z.zone_name
+ORDER BY average_fill DESC;
+
+
+-- ============================================================
+-- 3. NESTED QUERY
+-- Find bins above the overall average fill level
+-- ============================================================
+
+SELECT 
+    bin_id,
+    fill_level_percent,
+    status
+FROM Bins
+WHERE fill_level_percent > (
+    SELECT AVG(fill_level_percent)
+    FROM Bins
+)
+ORDER BY fill_level_percent DESC;
+
+
+-- ============================================================
+-- 4. ROUTE ANALYSIS
+-- Show routes, drivers, vehicles and number of stops
+-- ============================================================
+
+SELECT 
+    r.route_id,
+    r.route_name,
+    d.first_name || ' ' || d.last_name AS driver_name,
+    v.registration_number AS vehicle,
+    COUNT(rb.bin_id) AS total_stops
+FROM Routes r
+LEFT JOIN Drivers d ON r.driver_id = d.driver_id
+LEFT JOIN Vehicles v ON r.vehicle_id = v.vehicle_id
+LEFT JOIN Route_Bins rb ON r.route_id = rb.route_id
+GROUP BY 
+    r.route_id,
+    r.route_name,
+    d.first_name,
+    d.last_name,
+    v.registration_number
+ORDER BY r.route_id;
+
+
+-- ============================================================
+-- 5. SCHEDULE ANALYSIS
+-- Show schedules with route and assigned driver
+-- ============================================================
+
+SELECT 
+    s.schedule_id,
+    TO_CHAR(s.scheduled_date, 'DD-MM-YYYY') AS scheduled_date,
+    r.route_name,
+    d.first_name || ' ' || d.last_name AS driver_name,
+    s.status
+FROM Schedules s
+JOIN Routes r ON s.route_id = r.route_id
+LEFT JOIN Drivers d ON r.driver_id = d.driver_id
+ORDER BY s.scheduled_date DESC;
