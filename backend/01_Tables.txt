@@ -1,0 +1,311 @@
+-- ============================================================
+-- SMART WASTE COLLECTION MANAGEMENT
+-- DBMS MICROPROJECT
+-- ============================================================
+--
+-- CORE DATABASE TABLES
+-- 1. Zones
+-- 2. Locations
+-- 3. Bins
+-- 4. Drivers
+-- 5. Vehicles
+-- 6. Routes
+-- 7. Route_Bins
+-- 8. Schedules
+--
+-- The database is normalized and interconnected using
+-- primary keys and foreign keys.
+-- ============================================================
+
+
+-- ============================================================
+-- 1. ZONES
+-- ============================================================
+-- Stores geographical zones in which waste collection
+-- activities are organized.
+--
+-- Relationship:
+-- Zones → Locations
+-- ============================================================
+
+CREATE TABLE Zones (
+    zone_id NUMBER PRIMARY KEY,
+    zone_name VARCHAR2(100) NOT NULL,
+    city VARCHAR2(100) NOT NULL,
+    priority_level NUMBER DEFAULT 1,
+
+    -- Priority must be between 1 and 5
+    CHECK (priority_level BETWEEN 1 AND 5),
+
+    -- Each zone must have a unique name
+    UNIQUE (zone_name)
+);
+
+
+-- ============================================================
+-- 2. LOCATIONS
+-- ============================================================
+-- Stores the physical locations where waste bins are placed.
+--
+-- Relationship:
+-- Locations → Zones
+-- Bins → Locations
+-- ============================================================
+
+CREATE TABLE Locations (
+    location_id NUMBER PRIMARY KEY,
+    zone_id NUMBER NOT NULL,
+    street_address VARCHAR2(200) NOT NULL,
+    latitude NUMBER(10,7) NOT NULL,
+    longitude NUMBER(10,7) NOT NULL,
+
+    -- Each location belongs to a zone
+    FOREIGN KEY (zone_id)
+        REFERENCES Zones(zone_id)
+);
+
+
+-- ============================================================
+-- 3. BINS
+-- ============================================================
+-- Stores information about individual waste bins.
+--
+-- Relationship:
+-- Bins → Locations
+-- Route_Bins → Bins
+--
+-- This table is important for monitoring fill levels
+-- and identifying critical/overflowing bins.
+-- ============================================================
+
+CREATE TABLE Bins (
+    bin_id NUMBER PRIMARY KEY,
+    location_id NUMBER NOT NULL,
+    capacity_liters NUMBER(8,2) NOT NULL,
+    fill_level_percent NUMBER(5,2) DEFAULT 0.00,
+    status VARCHAR2(20) DEFAULT 'Active',
+
+    -- Bin capacity must be positive
+    CHECK (capacity_liters > 0),
+
+    -- Fill level must remain between 0% and 100%
+    CHECK (fill_level_percent BETWEEN 0.00 AND 100.00),
+
+    -- Allowed bin statuses
+    CHECK (status IN ('Active', 'Maintenance', 'Disabled')),
+
+    -- One bin is assigned to one location
+    UNIQUE (location_id),
+
+    -- Connect bin to its physical location
+    FOREIGN KEY (location_id)
+        REFERENCES Locations(location_id)
+);
+
+
+-- ============================================================
+-- 4. DRIVERS
+-- ============================================================
+-- Stores information about waste collection drivers.
+--
+-- Relationship:
+-- Drivers → Routes
+-- ============================================================
+
+CREATE TABLE Drivers (
+    driver_id NUMBER PRIMARY KEY,
+    first_name VARCHAR2(50) NOT NULL,
+    last_name VARCHAR2(50) NOT NULL,
+    license_number VARCHAR2(50) NOT NULL,
+    phone VARCHAR2(20) NOT NULL,
+    status VARCHAR2(20),
+
+    -- Driver license number must be unique
+    UNIQUE (license_number),
+
+    -- Allowed driver statuses
+    CHECK (status IN ('Available', 'On Duty', 'Off Duty'))
+);
+
+
+-- ============================================================
+-- 5. VEHICLES
+-- ============================================================
+-- Stores waste collection vehicle information.
+--
+-- Relationship:
+-- Vehicles → Routes
+-- ============================================================
+
+CREATE TABLE Vehicles (
+    vehicle_id NUMBER PRIMARY KEY,
+    registration_number VARCHAR2(20) NOT NULL,
+    capacity_kg NUMBER(10,2) NOT NULL,
+    status VARCHAR2(20) DEFAULT 'Operational',
+
+    -- Vehicle capacity must be positive
+    CHECK (capacity_kg > 0),
+
+    -- Allowed vehicle statuses
+    CHECK (
+        status IN (
+            'Operational',
+            'Under Maintenance',
+            'Decommissioned'
+        )
+    ),
+
+    -- Registration number must be unique
+    UNIQUE (registration_number)
+);
+
+
+-- ============================================================
+-- 6. ROUTES
+-- ============================================================
+-- Stores waste collection routes.
+--
+-- A route can be associated with:
+--   • A zone
+--   • A vehicle
+--   • A driver
+--
+-- Relationship:
+-- Routes → Zones
+-- Routes → Vehicles
+-- Routes → Drivers
+-- Route_Bins → Routes
+-- Schedules → Routes
+-- ============================================================
+
+CREATE TABLE Routes (
+    route_id NUMBER PRIMARY KEY,
+    zone_id NUMBER NOT NULL,
+    vehicle_id NUMBER,
+    driver_id NUMBER,
+    route_name VARCHAR2(100) NOT NULL,
+    total_distance_km NUMBER(6,2),
+    estimated_duration_mins NUMBER,
+
+    -- Distance cannot be negative
+    CHECK (total_distance_km >= 0),
+
+    -- Duration cannot be negative
+    CHECK (estimated_duration_mins >= 0),
+
+    -- Every route belongs to a zone
+    FOREIGN KEY (zone_id)
+        REFERENCES Zones(zone_id),
+
+    -- Optional vehicle assignment
+    FOREIGN KEY (vehicle_id)
+        REFERENCES Vehicles(vehicle_id),
+
+    -- Optional driver assignment
+    FOREIGN KEY (driver_id)
+        REFERENCES Drivers(driver_id)
+);
+
+
+-- ============================================================
+-- 7. ROUTE_BINS
+-- ============================================================
+-- Junction/associative table connecting Routes and Bins.
+--
+-- This resolves the many-to-many relationship:
+--
+--       ROUTES  ←→  BINS
+--
+-- A route can contain multiple bins.
+-- A bin can be assigned to different routes over time.
+--
+-- stop_sequence determines the order in which bins
+-- are visited during a route.
+-- ============================================================
+
+CREATE TABLE Route_Bins (
+    route_id NUMBER NOT NULL,
+    bin_id NUMBER NOT NULL,
+    stop_sequence NUMBER NOT NULL,
+
+    -- Composite primary key
+    -- Prevents the same bin from being added twice
+    -- to the same route.
+    PRIMARY KEY (route_id, bin_id),
+
+    -- A route cannot have two bins at the same
+    -- stop position.
+    UNIQUE (route_id, stop_sequence),
+
+    -- Stop sequence must start from a positive number
+    CHECK (stop_sequence > 0),
+
+    -- Connect route to Routes table
+    FOREIGN KEY (route_id)
+        REFERENCES Routes(route_id),
+
+    -- Connect bin to Bins table
+    FOREIGN KEY (bin_id)
+        REFERENCES Bins(bin_id)
+);
+
+
+-- ============================================================
+-- 8. SCHEDULES
+-- ============================================================
+-- Stores collection schedules for routes.
+--
+-- Relationship:
+-- Schedules → Routes
+--
+-- A schedule determines when a particular route
+-- is planned to operate.
+-- ============================================================
+
+CREATE TABLE Schedules (
+    schedule_id NUMBER PRIMARY KEY,
+    route_id NUMBER NOT NULL,
+    scheduled_date DATE NOT NULL,
+    start_time VARCHAR2(10),
+    end_time VARCHAR2(10),
+    status VARCHAR2(20) DEFAULT 'Scheduled',
+
+    -- Allowed schedule statuses
+    CHECK (
+        status IN (
+            'Scheduled',
+            'In Progress',
+            'Completed',
+            'Cancelled'
+        )
+    ),
+
+    -- Every schedule belongs to a route
+    FOREIGN KEY (route_id)
+        REFERENCES Routes(route_id)
+);
+
+
+-- ============================================================
+-- END OF 8 CORE TABLES
+-- ============================================================
+--
+-- NORMALIZED RELATIONSHIP STRUCTURE:
+--
+-- Zones
+--   ↓
+-- Locations
+--   ↓
+-- Bins
+--   ↓
+-- Route_Bins
+--   ↓
+-- Routes
+--   ├── Drivers
+--   ├── Vehicles
+--   └── Zones
+--        ↓
+--     Schedules
+--
+-- ============================================================
+is this correct right this is the code u given me right
