@@ -1,0 +1,37 @@
+SET LINESIZE 200;
+SET PAGESIZE 50;
+COLUMN location_name FORMAT A30;
+COLUMN status FORMAT A15;
+COLUMN registration_number FORMAT A15;
+-- Test 1: Verify Direct Route Dispatch with Guards
+DECLARE
+    v_new_route_id NUMBER;
+BEGIN
+    sp_run_dispatch(p_vehicle_id => 1, p_route_id => v_new_route_id);
+    DBMS_OUTPUT.PUT_LINE('Dispatched Route ID: ' || v_new_route_id);
+END;
+/
+
+SELECT vehicle_id, status FROM vehicles WHERE vehicle_id = 1;
+SELECT route_id, vehicle_id, status FROM routes WHERE status = 'In Progress';
+
+-- Test 2: Verify IoT Sensor Simulation
+EXEC sp_simulate_sensor_spike;
+
+SELECT bin_id, current_fill_level FROM bins WHERE current_fill_level >= 80;
+
+-- Test 3: Verify Route Completion and Audit Logs
+-- (Uses the active route ID created in Test 1)
+DECLARE
+    v_route_id NUMBER;
+BEGIN
+    SELECT MAX(route_id) INTO v_route_id FROM routes WHERE status = 'In Progress';
+    sp_complete_route(p_route_id);
+END;
+/
+
+SELECT route_id, status FROM routes;
+SELECT vehicle_id, status FROM vehicles WHERE vehicle_id = 1;
+SELECT * FROM vw_collection_analytics;
+SELECT bin_id, current_fill_level FROM bins WHERE bin_id = 3;FROM bins 
+WHERE bin_id = 1;

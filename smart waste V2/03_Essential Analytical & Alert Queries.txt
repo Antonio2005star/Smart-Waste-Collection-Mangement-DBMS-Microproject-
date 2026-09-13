@@ -1,0 +1,43 @@
+-- 1. ALERT QUERY: Identify Bins Requiring Urgent Collection (Fill Level >= 80%)
+SELECT 
+    bin_id,
+    location_name,
+    current_fill_level,
+    capacity_liters,
+    ROUND((current_fill_level / capacity_liters) * 100, 2) AS fill_percentage
+FROM bins
+WHERE current_fill_level >= 80
+ORDER BY current_fill_level DESC;
+
+-- 2. DISPATCH QUERY: Active Route Summary with Vehicle and Stop Details
+SELECT 
+    r.route_id,
+    v.registration_number,
+    r.scheduled_date,
+    r.status AS route_status,
+    COUNT(rs.stop_id) AS total_stops
+FROM routes r
+JOIN vehicles v ON r.vehicle_id = v.vehicle_id
+LEFT JOIN route_stops rs ON r.route_id = rs.route_id
+GROUP BY r.route_id, v.registration_number, r.scheduled_date, r.status
+ORDER BY r.scheduled_date DESC;
+
+-- 3. AUDIT QUERY: Collection Log History with Pickup Metrics
+SELECT 
+    cl.log_id,
+    b.location_name,
+    v.registration_number,
+    cl.collected_at,
+    cl.fill_level_before_collection
+FROM collection_logs cl
+JOIN bins b ON cl.bin_id = b.bin_id
+JOIN vehicles v ON cl.vehicle_id = v.vehicle_id
+ORDER BY cl.collected_at DESC;
+
+-- 4. AGGREGATE KPI: Operational Fleet and Collection Summary
+SELECT 
+    (SELECT COUNT(*) FROM bins) AS total_bins,
+    (SELECT COUNT(*) FROM bins WHERE current_fill_level >= 80) AS critical_bins,
+    (SELECT COUNT(*) FROM vehicles WHERE status = 'Available') AS available_vehicles,
+    (SELECT COUNT(*) FROM routes WHERE status = 'In Progress') AS active_routes
+FROM DUAL;
