@@ -1,0 +1,428 @@
+-- ============================================================
+-- FEATURE 1 : BIN MONITORING
+-- ============================================================
+
+SET LINESIZE 200
+SET PAGESIZE 50
+SET TAB OFF
+SET TRIMSPOOL ON
+SET SERVEROUTPUT ON
+SET SQLBLANKLINES ON
+
+
+-- ============================================================
+-- QUERY 1 : BIN FILL-LEVEL MONITORING
+-- ============================================================
+
+COLUMN BIN_ID FORMAT 9999
+COLUMN CAPACITY_LITERS FORMAT 99999
+COLUMN FILL_LEVEL_PERCENT FORMAT 990.0
+COLUMN STREET_ADDRESS FORMAT A25
+COLUMN ZONE_NAME FORMAT A25
+COLUMN CITY FORMAT A15
+COLUMN PRIORITY_LEVEL FORMAT 99
+COLUMN CONDITION_STATUS FORMAT A12
+
+SELECT
+    b.bin_id,
+    b.capacity_liters,
+    b.fill_level_percent,
+    l.street_address,
+    z.zone_name,
+    z.city,
+    z.priority_level,
+
+    CASE
+        WHEN b.fill_level_percent >= 90 THEN 'Critical'
+        WHEN b.fill_level_percent >= 75 THEN 'High'
+        WHEN b.fill_level_percent >= 50 THEN 'Moderate'
+        ELSE 'Normal'
+    END AS condition_status
+
+FROM Bins b
+JOIN Locations l
+    ON b.location_id = l.location_id
+JOIN Zones z
+    ON l.zone_id = z.zone_id
+
+ORDER BY b.fill_level_percent DESC;
+
+
+-- ============================================================
+-- QUERY 2 : CRITICAL BIN DETECTION
+-- ============================================================
+
+COLUMN BIN_ID FORMAT 9999
+COLUMN FILL_LEVEL_PERCENT FORMAT 990.0
+COLUMN CAPACITY_LITERS FORMAT 99999
+COLUMN STREET_ADDRESS FORMAT A25
+COLUMN ZONE_NAME FORMAT A25
+COLUMN PRIORITY_LEVEL FORMAT 99
+
+SELECT
+    b.bin_id,
+    b.fill_level_percent,
+    b.capacity_liters,
+    l.street_address,
+    z.zone_name,
+    z.priority_level
+
+FROM Bins b
+JOIN Locations l
+    ON b.location_id = l.location_id
+JOIN Zones z
+    ON l.zone_id = z.zone_id
+
+WHERE b.fill_level_percent >= 90
+
+ORDER BY b.fill_level_percent DESC;
+
+
+-- ============================================================
+-- QUERY 3 : REMAINING BIN CAPACITY
+-- ============================================================
+
+COLUMN BIN_ID FORMAT 9999
+COLUMN CAPACITY_LITERS FORMAT 99999
+COLUMN FILL_LEVEL_PERCENT FORMAT 990.0
+COLUMN REMAINING_CAPACITY_LITERS FORMAT 99999.99
+
+SELECT
+    b.bin_id,
+    b.capacity_liters,
+    b.fill_level_percent,
+
+    b.capacity_liters -
+    (b.capacity_liters * b.fill_level_percent / 100)
+    AS remaining_capacity_liters
+
+FROM Bins b
+
+ORDER BY remaining_capacity_liters ASC;
+
+
+-- ============================================================
+-- QUERY 4 : ESTIMATED WASTE VOLUME
+-- ============================================================
+
+COLUMN BIN_ID FORMAT 9999
+COLUMN CAPACITY_LITERS FORMAT 99999
+COLUMN FILL_LEVEL_PERCENT FORMAT 990.0
+COLUMN ESTIMATED_WASTE_LITERS FORMAT 99999.99
+
+SELECT
+    bin_id,
+    capacity_liters,
+    fill_level_percent,
+
+    capacity_liters *
+    fill_level_percent / 100
+    AS estimated_waste_liters
+
+FROM Bins
+
+ORDER BY estimated_waste_liters DESC;
+
+
+-- ============================================================
+-- QUERY 5 : ZONE-WISE AVERAGE FILL LEVEL
+-- ============================================================
+
+COLUMN ZONE_ID FORMAT 99
+COLUMN ZONE_NAME FORMAT A25
+COLUMN CITY FORMAT A15
+COLUMN PRIORITY_LEVEL FORMAT 99
+COLUMN TOTAL_BINS FORMAT 999
+COLUMN AVERAGE_FILL_LEVEL FORMAT 990.00
+
+SELECT
+    z.zone_id,
+    z.zone_name,
+    z.city,
+    z.priority_level,
+    COUNT(b.bin_id) AS total_bins,
+    AVG(b.fill_level_percent) AS average_fill_level
+
+FROM Zones z
+JOIN Locations l
+    ON z.zone_id = l.zone_id
+JOIN Bins b
+    ON l.location_id = b.location_id
+
+GROUP BY
+    z.zone_id,
+    z.zone_name,
+    z.city,
+    z.priority_level
+
+ORDER BY average_fill_level DESC;
+
+
+-- ============================================================
+-- QUERY 6 : CRITICAL BINS BY ZONE
+-- ============================================================
+
+COLUMN ZONE_NAME FORMAT A25
+COLUMN PRIORITY_LEVEL FORMAT 99
+COLUMN CRITICAL_BINS FORMAT 999
+
+SELECT
+    z.zone_name,
+    z.priority_level,
+    COUNT(b.bin_id) AS critical_bins
+
+FROM Zones z
+JOIN Locations l
+    ON z.zone_id = l.zone_id
+JOIN Bins b
+    ON l.location_id = b.location_id
+
+WHERE b.fill_level_percent >= 90
+
+GROUP BY
+    z.zone_name,
+    z.priority_level
+
+ORDER BY critical_bins DESC;
+
+
+-- ============================================================
+-- QUERY 7 : ZONE PRIORITY ANALYSIS
+-- ============================================================
+
+COLUMN ZONE_NAME FORMAT A25
+COLUMN PRIORITY_LEVEL FORMAT 99
+COLUMN TOTAL_BINS FORMAT 999
+COLUMN AVERAGE_FILL_LEVEL FORMAT 990.00
+COLUMN CRITICAL_BINS FORMAT 999
+
+SELECT
+    z.zone_name,
+    z.priority_level,
+    COUNT(b.bin_id) AS total_bins,
+    AVG(b.fill_level_percent) AS average_fill_level,
+
+    SUM(
+        CASE
+            WHEN b.fill_level_percent >= 90 THEN 1
+            ELSE 0
+        END
+    ) AS critical_bins
+
+FROM Zones z
+JOIN Locations l
+    ON z.zone_id = l.zone_id
+JOIN Bins b
+    ON l.location_id = b.location_id
+
+GROUP BY
+    z.zone_name,
+    z.priority_level
+
+ORDER BY
+    z.priority_level DESC,
+    average_fill_level DESC;
+
+
+-- ============================================================
+-- QUERY 8 : COLLECTION RECOMMENDATION
+-- ============================================================
+
+COLUMN ZONE_NAME FORMAT A25
+COLUMN PRIORITY_LEVEL FORMAT 99
+COLUMN AVERAGE_FILL_LEVEL FORMAT 990.00
+COLUMN MAXIMUM_FILL_LEVEL FORMAT 990.00
+COLUMN COLLECTION_RECOMMENDATION FORMAT A25
+
+SELECT
+    z.zone_name,
+    z.priority_level,
+
+    AVG(b.fill_level_percent)
+        AS average_fill_level,
+
+    MAX(b.fill_level_percent)
+        AS maximum_fill_level,
+
+    CASE
+        WHEN MAX(b.fill_level_percent) >= 90
+            THEN 'Immediate Collection'
+
+        WHEN AVG(b.fill_level_percent) >= 75
+            THEN 'Collection Required'
+
+        WHEN AVG(b.fill_level_percent) >= 50
+            THEN 'Monitor'
+
+        ELSE 'No Immediate Action'
+    END AS collection_recommendation
+
+FROM Zones z
+JOIN Locations l
+    ON z.zone_id = l.zone_id
+JOIN Bins b
+    ON l.location_id = b.location_id
+
+GROUP BY
+    z.zone_name,
+    z.priority_level
+
+ORDER BY average_fill_level DESC;
+
+
+-- ============================================================
+-- PL/SQL 1 : FUNCTION TO DETERMINE BIN CONDITION
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION get_bin_condition (
+    p_fill_level NUMBER
+)
+RETURN VARCHAR2
+IS
+BEGIN
+
+    IF p_fill_level >= 90 THEN
+        RETURN 'Critical';
+
+    ELSIF p_fill_level >= 75 THEN
+        RETURN 'High';
+
+    ELSIF p_fill_level >= 50 THEN
+        RETURN 'Moderate';
+
+    ELSE
+        RETURN 'Normal';
+
+    END IF;
+
+END;
+/
+
+SHOW ERRORS;
+
+
+-- ============================================================
+-- PL/SQL 2 : CURSOR-BASED BIN MONITORING REPORT
+-- ============================================================
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+
+    CURSOR bin_cursor IS
+
+        SELECT
+            b.bin_id,
+            b.fill_level_percent,
+            b.capacity_liters,
+            l.street_address,
+            z.zone_name,
+            z.priority_level
+
+        FROM Bins b
+
+        JOIN Locations l
+            ON b.location_id = l.location_id
+
+        JOIN Zones z
+            ON l.zone_id = z.zone_id
+
+        ORDER BY b.fill_level_percent DESC;
+
+BEGIN
+
+    DBMS_OUTPUT.PUT_LINE(
+        '===== BIN MONITORING REPORT ====='
+    );
+
+    FOR b IN bin_cursor LOOP
+
+        DBMS_OUTPUT.PUT_LINE(
+            'Bin ID: ' || b.bin_id ||
+            ' | Zone: ' || b.zone_name ||
+            ' | Fill: ' || b.fill_level_percent || '%' ||
+            ' | Condition: ' ||
+            get_bin_condition(b.fill_level_percent)
+        );
+
+    END LOOP;
+
+END;
+/
+
+
+-- ============================================================
+-- PL/SQL 3 : PROCEDURE TO CHECK INDIVIDUAL BIN
+-- ============================================================
+
+CREATE OR REPLACE PROCEDURE check_bin (
+    p_bin_id IN NUMBER
+)
+IS
+
+    v_fill_level Bins.fill_level_percent%TYPE;
+    v_capacity Bins.capacity_liters%TYPE;
+    v_condition VARCHAR2(20);
+
+BEGIN
+
+    SELECT
+        fill_level_percent,
+        capacity_liters
+
+    INTO
+        v_fill_level,
+        v_capacity
+
+    FROM Bins
+
+    WHERE bin_id = p_bin_id;
+
+
+    v_condition :=
+        get_bin_condition(v_fill_level);
+
+
+    DBMS_OUTPUT.PUT_LINE(
+        '===== BIN STATUS ====='
+    );
+
+    DBMS_OUTPUT.PUT_LINE(
+        'Bin ID     : ' || p_bin_id
+    );
+
+    DBMS_OUTPUT.PUT_LINE(
+        'Capacity   : ' || v_capacity || ' L'
+    );
+
+    DBMS_OUTPUT.PUT_LINE(
+        'Fill Level : ' || v_fill_level || '%'
+    );
+
+    DBMS_OUTPUT.PUT_LINE(
+        'Condition  : ' || v_condition
+    );
+
+
+EXCEPTION
+
+    WHEN NO_DATA_FOUND THEN
+
+        DBMS_OUTPUT.PUT_LINE(
+            'Bin does not exist.'
+        );
+
+END;
+/
+
+SHOW ERRORS;
+
+
+-- ============================================================
+-- TEST PROCEDURE
+-- ============================================================
+
+BEGIN
+    check_bin(501);
+END;
+/

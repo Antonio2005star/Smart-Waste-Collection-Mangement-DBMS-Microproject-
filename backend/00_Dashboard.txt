@@ -1,0 +1,47 @@
+-- ============================================================
+-- FEATURE 0: DASHBOARD / SYSTEM OVERVIEW
+-- ============================================================
+
+SET LINESIZE 200
+SET PAGESIZE 50
+SET TAB OFF
+SET TRIMSPOOL ON
+
+COLUMN TOTAL_ROUTES FORMAT 9999990
+COLUMN TOTAL_BINS FORMAT 9999990
+COLUMN AVERAGE_FILL_LEVEL FORMAT 990.99
+COLUMN CRITICAL_BINS FORMAT 9999990
+
+-- ============================================================
+-- 0A. TOTAL NUMBER OF ROUTES
+-- ============================================================
+
+SELECT COUNT(*) AS TOTAL_ROUTES
+FROM Routes;
+
+
+-- ============================================================
+-- 0B. TOTAL NUMBER OF BINS
+-- ============================================================
+
+SELECT COUNT(*) AS TOTAL_BINS
+FROM Bins;
+
+
+-- ============================================================
+-- 0C. AVERAGE BIN FILL LEVEL
+-- ============================================================
+
+SELECT ROUND(AVG(FILL_LEVEL_PERCENT), 2)
+       AS AVERAGE_FILL_LEVEL
+FROM Bins;
+
+
+-- ============================================================
+-- 0D. NUMBER OF CRITICAL BINS
+-- Critical bins have a fill level of 80% or above
+-- ============================================================
+
+SELECT COUNT(*) AS CRITICAL_BINS
+FROM Bins
+WHERE FILL_LEVEL_PERCENT >= 80;
