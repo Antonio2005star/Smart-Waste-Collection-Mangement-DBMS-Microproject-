@@ -1,0 +1,105 @@
+-- ==========================================
+-- 6. SQL REPORTS & OPTIMIZATION
+-- Purpose: Analytical layer for Dispatchers and Administrators.
+-- Demonstrates: Joins, Aggregates (GROUP BY), and CASE logic.
+-- ==========================================
+
+-- Clean up existing views
+DROP VIEW V_Needs_Collection;
+DROP VIEW V_Route_Workload;
+DROP VIEW V_Daily_Schedule;
+DROP VIEW V_Collection_Efficiency;
+DROP VIEW V_Area_Analysis;
+DROP VIEW V_Problematic_Bins;
+
+-- ---------------------------------------------------------
+-- 6.1: BINS REQUIRING COLLECTION (Operational Action List)
+-- ---------------------------------------------------------
+CREATE OR REPLACE VIEW V_Needs_Collection AS
+SELECT 
+    bin_id, 
+    area_name, 
+    location_address, 
+    fill_level || '%' AS current_fill,
+    collection_status AS alert_status
+FROM Bins
+WHERE fill_level >= 75
+ORDER BY fill_level DESC;
+
+-- ---------------------------------------------------------
+-- 6.2 & 6.4: DAILY SCHEDULE & VEHICLE UTILIZATION
+-- ---------------------------------------------------------
+CREATE OR REPLACE VIEW V_Daily_Schedule AS
+SELECT 
+    s.schedule_id, 
+    s.schedule_date, 
+    r.route_name, 
+    v.registration_number AS vehicle_reg,
+    d.name AS driver_name,
+    s.status AS schedule_status
+FROM Schedules s
+JOIN Routes r ON s.route_id = r.route_id
+JOIN Vehicles v ON s.vehicle_id = v.vehicle_id
+JOIN Drivers d ON s.driver_id = d.driver_id;
+
+-- ---------------------------------------------------------
+-- 6.3: ROUTE-WISE BIN COUNT (Workload Balancing)
+-- ---------------------------------------------------------
+CREATE OR REPLACE VIEW V_Route_Workload AS
+SELECT 
+    r.route_id, 
+    r.route_name, 
+    COUNT(rb.bin_id) AS total_assigned_bins,
+    r.start_location || ' to ' || r.end_location AS full_path
+FROM Routes r
+LEFT JOIN Route_Bins rb ON r.route_id = rb.route_id
+GROUP BY r.route_id, r.route_name, r.start_location, r.end_location;
+
+-- ---------------------------------------------------------
+-- 6.6: COLLECTION EFFICIENCY REPORT
+-- Logic: Uses NULLIF to prevent "Division by Zero" errors
+-- ---------------------------------------------------------
+CREATE OR REPLACE VIEW V_Collection_Efficiency AS
+SELECT 
+    schedule_id, 
+    COUNT(*) AS total_planned,
+    COUNT(CASE WHEN status = 'Collected' THEN 1 END) AS total_collected,
+    COUNT(CASE WHEN status IN ('Skipped', 'Failed') THEN 1 END) AS total_missed,
+    -- Safety check: if planned is 0, return 0 instead of an error
+    ROUND((COUNT(CASE WHEN status = 'Collected' THEN 1 END) / NULLIF(COUNT(*), 0)) * 100, 2) || '%' AS success_rate
+FROM Pickups
+GROUP BY schedule_id;
+
+-- ---------------------------------------------------------
+-- 6.7: AREA-WISE WASTE GENERATION (Analysis)
+-- ---------------------------------------------------------
+CREATE OR REPLACE VIEW V_Area_Analysis AS
+SELECT 
+    area_name, 
+    COUNT(bin_id) AS number_of_bins,
+    ROUND(AVG(fill_level), 2) AS avg_fill_pct
+FROM Bins
+GROUP BY area_name;
+
+-- ---------------------------------------------------------
+-- 6.8: FREQUENTLY OVERFLOWING BINS (Optimization)
+-- Logic: Analyzes the Fill_Level_History table created by the Trigger
+-- ---------------------------------------------------------
+CREATE OR REPLACE VIEW V_Problematic_Bins AS
+SELECT 
+    bin_id, 
+    COUNT(*) AS overflow_incidents
+FROM Fill_Level_History
+WHERE recorded_level >= 90
+GROUP BY bin_id
+HAVING COUNT(*) >= 1; 
+
+-- ==========================================
+-- TEST QUERIES
+-- ==========================================
+PROMPT --- Analytics Dashboard Loaded ---
+PROMPT Running Efficiency Report...
+SELECT * FROM V_Collection_Efficiency;
+
+PROMPT Running Area Analysis...
+SELECT * FROM V_Area_Analysis;
