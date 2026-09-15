@@ -1,0 +1,108 @@
+SET SERVEROUTPUT ON;
+SET FEEDBACK OFF;
+SET PAGESIZE 50;
+SET LINESIZE 120;
+
+-- ==========================================
+-- STEP 0: CLEANUP (Deleting existing information)
+-- We delete in reverse order of Foreign Keys to avoid constraint errors.
+-- ==========================================
+PROMPT [STEP 0] Cleaning existing database records...
+DELETE FROM Pickups;
+DELETE FROM Schedules;
+DELETE FROM Route_Bins;
+DELETE FROM Routes;
+DELETE FROM Driver_Phones;
+DELETE FROM Drivers;
+DELETE FROM Vehicles;
+DELETE FROM Fill_Level_History;
+DELETE FROM Bins;
+COMMIT;
+PROMPT Database is now clean. Starting Test Execution...
+PROMPT ---------------------------------------------------
+
+-- ==========================================
+-- STEP 1: BIN MANAGEMENT (Feature 1)
+-- ==========================================
+PROMPT [STEP 1] Registering Bins and Simulating Sensors...
+INSERT INTO Bins (bin_type, area_name, location_address, fill_level) VALUES ('Plastic', 'Rajagiri', 'Main Gate', 10);
+INSERT INTO Bins (bin_type, area_name, location_address, fill_level) VALUES ('Organic', 'Kakkanad', 'Civil Station', 15);
+COMMIT;
+
+-- Test Procedure: Update Fill Level (Triggers History and Status Function)
+EXEC Update_Fill_Level(1, 95); -- Bin 1 is now Overflow
+EXEC Update_Fill_Level(2, 80); -- Bin 2 is now Nearly Full
+
+PROMPT History Log (Feature 1.5):
+SELECT bin_id, recorded_level, reading_timestamp FROM Fill_Level_History;
+
+-- ==========================================
+-- STEP 2: RESOURCE MANAGEMENT (Feature 4)
+-- ==========================================
+PROMPT [STEP 2] Registering Vehicles and Drivers (Normalized)...
+EXEC Register_Vehicle('KL-01-SMART-01', 'Compactor', 5000);
+EXEC Register_Driver('Akshay Kumar');
+
+-- Multi-valued Phone Normalization
+EXEC Add_Driver_Phone(1, '9995551234', 'Work');
+EXEC Add_Driver_Phone(1, '8884445678', 'Personal');
+
+-- ==========================================
+-- STEP 3: ROUTE MANAGEMENT (Feature 2)
+-- ==========================================
+PROMPT [STEP 3] Creating Routes and Assigning Bins (Many-to-Many)...
+INSERT INTO Routes (route_name, start_location, end_location) VALUES ('Morning Tech Loop', 'Main Garage', 'Disposal Site');
+
+-- Assign Bins 1 and 2 to Route 1 in specific Stop Order
+EXEC Assign_Bin_To_Route(1, 1, 1);
+EXEC Assign_Bin_To_Route(1, 2, 2);
+
+PROMPT Route Stop Sequence (Feature 2.3 - Cursor FOR Loop):
+EXEC List_Route_Collection_Order(1);
+
+-- ==========================================
+-- STEP 4: COLLECTION SCHEDULING (Feature 3)
+-- ==========================================
+PROMPT [STEP 4] Planning the Collection Schedule...
+-- Plan Route 1 for Today
+EXEC Create_Collection_Schedule(1, 1, 1, SYSDATE, '08:00 AM');
+
+PROMPT Today's Schedule (Feature 3.3 - View):
+SELECT * FROM V_Today_Schedules;
+
+-- ==========================================
+-- STEP 5: PICKUP TRACKING & ALERTS (Feature 5)
+-- ==========================================
+PROMPT [STEP 5] Executing Collection and Testing Alerts...
+-- Link planned schedule to actual pickups
+INSERT INTO Pickups (schedule_id, bin_id) VALUES (1, 1);
+INSERT INTO Pickups (schedule_id, bin_id) VALUES (1, 2);
+COMMIT;
+
+-- Bin 1: Successfully Collected (Triggers Bin Fill Reset to 0)
+EXEC Update_Pickup_Status(1, 'Collected');
+
+-- Bin 2: Failed Collection
+EXEC Update_Pickup_Status(2, 'Failed', 'Road Blocked by Construction');
+
+PROMPT Collection Status After Pickup:
+SELECT bin_id, location_address, fill_level, collection_status FROM Bins;
+
+PROMPT Failed Collection Alert (Feature 5.4 - Parameterized Cursor):
+EXEC Alert_Unsuccessful_Pickups(1);
+
+-- ==========================================
+-- STEP 6: SQL REPORTS & OPTIMIZATION (Feature 6)
+-- ==========================================
+PROMPT [STEP 6] Generating Operational Reports...
+
+PROMPT Efficiency Report (Feature 6.6):
+SELECT schedule_id, success_rate FROM V_Collection_Efficiency;
+
+PROMPT Area-wise Waste Analysis (Feature 6.7):
+SELECT * FROM V_Area_Analysis;
+
+PROMPT Route Workload Balancing (Feature 6.3):
+SELECT * FROM V_Route_Workload;
+
+PROMPT --- MASTER TEST EXECUTION COMPLETED ---
